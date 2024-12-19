@@ -1,0 +1,25 @@
+{
+  "name": "receipt-management-system",
+  "version": "1.0.0",
+  "description": "A web-based platform for managing and organizing receipts, designed for organizations to streamline their expense tracking process.\r ## Features\r - Receipt upload and management\r  Automated file organization\r  CSV and report generation\r  Role-based access control\r  Integration with accounting systems\r ## Getting Started\r ### Prerequisites\r - Node.js (v14 or higher)\r  npm or yarn\r  MongoDB\r  Dropbox API credentials\r ### Installation\r 1. Clone the repository:\r ```bash\r git clone https://github.com/Umufundi/receipt-management-system.git\r ```\r 2. Navigate to the project directory:\r ```bash\r cd receipt-management-system\r ```\r 3. Install dependencies:\r ```bash\r npm install\r ```\r 4. Configure environment variables:\r ```bash\r cp .env.example .env\r # Edit .env with your configuration\r ```",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mongodb": "^6.12.0",
+    "mongoose": "^8.9.2",
+    "multer": "^1.4.5-lts.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}
