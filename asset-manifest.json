@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/receipt-management-system/static/css/main.63d6e0fe.css",
+    "main.js": "/receipt-management-system/static/js/main.0eec27f7.js",
+    "index.html": "/receipt-management-system/index.html",
+    "main.63d6e0fe.css.map": "/receipt-management-system/static/css/main.63d6e0fe.css.map",
+    "main.0eec27f7.js.map": "/receipt-management-system/static/js/main.0eec27f7.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.63d6e0fe.css",
+    "static/js/main.0eec27f7.js"
+  ]
+}
