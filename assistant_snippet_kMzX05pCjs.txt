@@ -1,0 +1,4 @@
+1|1. Make your changes
+2|2. Double-click git-push.bat
+3|3. Enter your commit message
+4|4. Wait for GitHub Actions to deploy 

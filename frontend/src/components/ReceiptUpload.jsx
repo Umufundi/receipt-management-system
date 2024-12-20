@@ -88,9 +88,12 @@ const ReceiptUpload = () => {
     });
 
     try {
+      console.log('Sending request to:', `${API_URL}/api/receipts`);
       const response = await fetch(`${API_URL}/api/receipts`, {
         method: 'POST',
-        body: data
+        body: data,
+        mode: 'cors',
+        credentials: 'omit'
       });
       
       if (!response.ok) {
@@ -98,6 +101,9 @@ const ReceiptUpload = () => {
         throw new Error(errorData.error || 'Failed to upload receipt');
       }
 
+      const result = await response.json();
+      console.log('Upload successful:', result);
+      
       setSuccess(true);
       // Reset form
       setFormData({
@@ -117,7 +123,7 @@ const ReceiptUpload = () => {
       if (fileInput) fileInput.value = '';
     } catch (error) {
       console.error('Upload failed:', error);
-      setError(error.message);
+      setError(error.message || 'Failed to connect to the server');
     } finally {
       setLoading(false);
     }

@@ -9,39 +9,60 @@ const Receipt = require('./models/Receipt');
 // Load environment variables
 dotenv.config();
 
-// MongoDB connection with recommended settings
-mongoose.connect(process.env.MONGODB_URI, {
-  serverApi: {
-    version: '1',
-    strict: true,
-    deprecationErrors: true,
-  }
-})
-.then(async () => {
-  console.log('Connected to MongoDB successfully');
-  // Send a ping to confirm a successful connection
-  await mongoose.connection.db.command({ ping: 1 });
-  console.log("Pinged your deployment. You successfully connected to MongoDB!");
-})
-.catch(err => {
-  console.error('MongoDB connection error:', err);
-  process.exit(1); // Exit if MongoDB connection fails
+// MongoDB connection with retry logic
+const connectWithRetry = () => {
+  console.log('MongoDB connection with retry');
+  mongoose.connect(process.env.MONGODB_URI, {
+    serverApi: {
+      version: '1',
+      strict: true,
+      deprecationErrors: true,
+    },
+    retryWrites: true,
+    w: 'majority',
+    retryReads: true,
+    maxPoolSize: 10,
+    connectTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+  })
+  .then(async () => {
+    console.log('Connected to MongoDB successfully');
+    // Send a ping to confirm a successful connection
+    await mongoose.connection.db.command({ ping: 1 });
+    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+  })
+  .catch(err => {
+    console.error('MongoDB connection error:', err);
+    console.log('Retrying in 5 seconds...');
+    setTimeout(connectWithRetry, 5000);
+  });
+};
+
+connectWithRetry();
+
+// Handle MongoDB disconnection
+mongoose.connection.on('disconnected', () => {
+  console.log('MongoDB disconnected! Reconnecting...');
+  setTimeout(connectWithRetry, 5000);
 });
 
 const app = express();
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
-  methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type']
+  origin: ['https://umufundi.github.io', 'http://localhost:3000', 'http://localhost:3001'],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type'],
+  credentials: false
 }));
 app.use(express.json());
 
-// Serve uploaded files statically in development
-if (process.env.NODE_ENV !== 'production') {
-  app.use('/uploads', express.static('uploads'));
-}
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(__dirname, '..', 'uploads');
+require('fs').mkdirSync(uploadsDir, { recursive: true });
+
+// Serve uploaded files
+app.use('/uploads', express.static(uploadsDir));
 
 // File type validation
 const fileFilter = (req, file, cb) => {
@@ -58,7 +79,7 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const year = new Date().getFullYear();
     const month = String(new Date().getMonth() + 1).padStart(2, '0');
-    const dir = path.join(process.env.STORAGE_PATH || 'uploads', year.toString(), month);
+    const dir = path.join(uploadsDir, year.toString(), month);
     
     // Create directory if it doesn't exist
     require('fs').mkdirSync(dir, { recursive: true });
@@ -97,6 +118,9 @@ app.post('/api/receipts', upload.single('receipt'), async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
+    const year = new Date().getFullYear();
+    const month = String(new Date().getMonth() + 1).padStart(2, '0');
+    
     console.log('Received file:', req.file.filename);
     console.log('Form data:', req.body);
 
@@ -118,11 +142,15 @@ app.post('/api/receipts', upload.single('receipt'), async (req, res) => {
 
     await receipt.save();
     console.log('Receipt saved to database:', receipt._id);
+    
+    // Generate the file URL
+    const fileUrl = `${process.env.BACKEND_URL || `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`}/uploads/${year}/${month}/${req.file.filename}`;
+    
     res.status(200).json({ 
       message: 'Receipt uploaded successfully', 
       receipt: {
         ...receipt.toObject(),
-        fileUrl: `${process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3001}`}/uploads/${year}/${month}/${req.file.filename}`
+        fileUrl
       }
     });
   } catch (error) {
@@ -136,7 +164,8 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok',
     mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    uploadsDir: uploadsDir
   });
 });
 
@@ -144,6 +173,6 @@ app.get('/health', (req, res) => {
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`Upload directory: ${process.env.STORAGE_PATH || 'uploads'}`);
+  console.log(`Upload directory: ${uploadsDir}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 }); 
