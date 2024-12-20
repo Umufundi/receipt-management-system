@@ -9,9 +9,51 @@ const Receipt = require('./models/Receipt');
 // Load environment variables
 dotenv.config();
 
-// MongoDB connection with retry logic
+// Logging functions
+const logInfo = (message, data = {}) => {
+  console.log(`[${new Date().toISOString()}] INFO: ${message}`, data);
+};
+
+const logError = (message, error) => {
+  console.error(`[${new Date().toISOString()}] ERROR: ${message}`, {
+    error: error?.message || error,
+    stack: error?.stack,
+    details: error
+  });
+};
+
+// Request logging middleware
+const requestLogger = (req, res, next) => {
+  const start = Date.now();
+  const requestId = Math.random().toString(36).substring(7);
+  
+  logInfo(`Incoming ${req.method} request to ${req.url}`, {
+    requestId,
+    method: req.method,
+    url: req.url,
+    query: req.query,
+    headers: req.headers,
+    body: req.method === 'POST' ? '<<BODY>>' : undefined
+  });
+
+  // Log response
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    logInfo(`Request completed`, {
+      requestId,
+      method: req.method,
+      url: req.url,
+      status: res.statusCode,
+      duration: `${duration}ms`
+    });
+  });
+
+  next();
+};
+
+// MongoDB connection with retry logic and logging
 const connectWithRetry = () => {
-  console.log('MongoDB connection with retry');
+  logInfo('Attempting MongoDB connection');
   mongoose.connect(process.env.MONGODB_URI, {
     serverApi: {
       version: '1',
@@ -26,14 +68,13 @@ const connectWithRetry = () => {
     socketTimeoutMS: 45000,
   })
   .then(async () => {
-    console.log('Connected to MongoDB successfully');
-    // Send a ping to confirm a successful connection
+    logInfo('Connected to MongoDB successfully');
     await mongoose.connection.db.command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    logInfo("MongoDB ping successful");
   })
   .catch(err => {
-    console.error('MongoDB connection error:', err);
-    console.log('Retrying in 5 seconds...');
+    logError('MongoDB connection error', err);
+    logInfo('Retrying MongoDB connection in 5 seconds...');
     setTimeout(connectWithRetry, 5000);
   });
 };
@@ -42,13 +83,14 @@ connectWithRetry();
 
 // Handle MongoDB disconnection
 mongoose.connection.on('disconnected', () => {
-  console.log('MongoDB disconnected! Reconnecting...');
+  logError('MongoDB disconnected');
   setTimeout(connectWithRetry, 5000);
 });
 
 const app = express();
 
 // Middleware
+app.use(requestLogger);
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'OPTIONS'],
@@ -140,16 +182,27 @@ const upload = multer({
   }
 });
 
-// Error handling middleware
+// Error handling middleware with logging
 app.use((err, req, res, next) => {
-  console.error('Error:', err.message);
+  logError('Request error', err);
+  
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'File size too large. Maximum size is 5MB.' });
+      return res.status(400).json({ 
+        error: 'File size too large. Maximum size is 5MB.',
+        code: 'FILE_TOO_LARGE'
+      });
     }
-    return res.status(400).json({ error: 'File upload error.' });
+    return res.status(400).json({ 
+      error: 'File upload error.',
+      code: err.code
+    });
   }
-  res.status(500).json({ error: err.message || 'Something went wrong!' });
+  
+  res.status(500).json({ 
+    error: err.message || 'Something went wrong!',
+    code: 'INTERNAL_SERVER_ERROR'
+  });
 });
 
 // Routes

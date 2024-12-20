@@ -3,15 +3,41 @@ import './ReceiptUpload.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
-// Add API health check
+// Debug logging function
+const logDebug = (message, data) => {
+  console.log(`[${new Date().toISOString()}] ${message}`, data);
+};
+
+// Error logging function
+const logError = (message, error) => {
+  console.error(`[${new Date().toISOString()}] ERROR: ${message}`, {
+    error: error?.message || error,
+    stack: error?.stack,
+    details: error
+  });
+};
+
+// Add API health check with detailed logging
 const checkApiHealth = async () => {
   try {
-    const response = await fetch(`${API_URL}/health`);
+    logDebug('Checking API health at:', `${API_URL}/health`);
+    const response = await fetch(`${API_URL}/health`, {
+      method: 'GET',
+      mode: 'cors',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Health check failed with status: ${response.status}`);
+    }
+    
     const data = await response.json();
-    console.log('API Health Check:', data);
+    logDebug('API Health Check Response:', data);
     return data.status === 'ok';
   } catch (error) {
-    console.error('API Health Check Failed:', error);
+    logError('API Health Check Failed', error);
     return false;
   }
 };
@@ -36,6 +62,11 @@ const ReceiptUpload = () => {
 
   // Add useEffect to check API health on component mount
   useEffect(() => {
+    logDebug('Component mounted, environment:', {
+      NODE_ENV: process.env.NODE_ENV,
+      API_URL: API_URL
+    });
+    
     checkApiHealth().then(isHealthy => {
       if (!isHealthy) {
         setError('Unable to connect to the server. Please try again later.');
@@ -110,9 +141,16 @@ const ReceiptUpload = () => {
     });
 
     try {
-      console.log('Sending request to:', `${API_URL}/api/receipts`);
-      console.log('Environment:', process.env.NODE_ENV);
-      console.log('API URL:', API_URL);
+      logDebug('Preparing to upload receipt', {
+        url: `${API_URL}/api/receipts`,
+        fileName: formData.receipt?.name,
+        fileSize: formData.receipt?.size,
+        fileType: formData.receipt?.type,
+        formData: {
+          ...formData,
+          receipt: `File: ${formData.receipt?.name}`
+        }
+      });
 
       const response = await fetch(`${API_URL}/api/receipts`, {
         method: 'POST',
@@ -120,17 +158,22 @@ const ReceiptUpload = () => {
         mode: 'cors',
         credentials: 'omit',
         headers: {
-          'Accept': 'application/json',
+          'Accept': 'application/json'
         }
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(e => ({ error: 'Failed to parse error response' }));
+        logError('Upload failed - Server Response', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData
+        });
         throw new Error(errorData.error || `Failed to upload receipt: ${response.status} ${response.statusText}`);
       }
 
       const result = await response.json();
-      console.log('Upload successful:', result);
+      logDebug('Upload successful', result);
       
       setSuccess(true);
       // Reset form
@@ -150,7 +193,7 @@ const ReceiptUpload = () => {
       const fileInput = document.getElementById('receipt');
       if (fileInput) fileInput.value = '';
     } catch (error) {
-      console.error('Upload failed:', error);
+      logError('Upload failed', error);
       setError(error.message || 'Failed to connect to the server. Please check your internet connection and try again.');
     } finally {
       setLoading(false);
