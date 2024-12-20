@@ -92,14 +92,32 @@ const app = express();
 // Middleware
 app.use(requestLogger);
 app.use(cors({
-  origin: '*',
+  origin: ['https://umufundi.github.io', 'http://localhost:3000'],
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   exposedHeaders: ['Content-Length', 'X-Requested-With'],
-  credentials: false
+  credentials: false,
+  optionsSuccessStatus: 200
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Add detailed CORS error handling
+app.use((err, req, res, next) => {
+  if (err.name === 'CORSError') {
+    logError('CORS Error', {
+      origin: req.headers.origin,
+      method: req.method,
+      headers: req.headers
+    });
+    return res.status(403).json({
+      error: 'CORS error',
+      message: err.message,
+      origin: req.headers.origin
+    });
+  }
+  next(err);
+});
 
 // Add OPTIONS handling for preflight requests
 app.options('*', cors());

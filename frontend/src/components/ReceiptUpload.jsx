@@ -160,6 +160,14 @@ const ReceiptUpload = () => {
         headers: {
           'Accept': 'application/json'
         }
+      }).catch(networkError => {
+        logError('Network Error', {
+          type: networkError.name,
+          message: networkError.message,
+          url: `${API_URL}/api/receipts`,
+          stack: networkError.stack
+        });
+        throw new Error('Network error: Unable to connect to the server. Please check your internet connection.');
       });
       
       if (!response.ok) {
@@ -167,7 +175,8 @@ const ReceiptUpload = () => {
         logError('Upload failed - Server Response', {
           status: response.status,
           statusText: response.statusText,
-          errorData
+          errorData,
+          headers: Object.fromEntries(response.headers.entries())
         });
         throw new Error(errorData.error || `Failed to upload receipt: ${response.status} ${response.statusText}`);
       }
