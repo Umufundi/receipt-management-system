@@ -50,12 +50,53 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ['https://umufundi.github.io', 'http://localhost:3000', 'http://localhost:3001'],
+  origin: '*',
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Length', 'X-Requested-With'],
   credentials: false
 }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Add OPTIONS handling for preflight requests
+app.options('*', cors());
+
+// Add a test endpoint
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    message: 'Receipt Management API is running',
+    version: '1.0.0',
+    endpoints: {
+      health: {
+        url: '/health',
+        method: 'GET',
+        description: 'Check API health status'
+      },
+      uploadReceipt: {
+        url: '/api/receipts',
+        method: 'POST',
+        description: 'Upload a new receipt',
+        accepts: 'multipart/form-data',
+        fields: {
+          employeeName: 'string (required)',
+          department: 'string (required)',
+          purchaseDate: 'date (required)',
+          vendor: 'string (required)',
+          amount: 'number (required)',
+          paymentMethod: 'string (required)',
+          category: 'string (required)',
+          projectCode: 'string (optional)',
+          description: 'string (optional)',
+          receipt: 'file (required, max 5MB, formats: JPEG, PNG, GIF, PDF)'
+        }
+      }
+    },
+    documentation: 'API Documentation will be available soon',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, '..', 'uploads');
@@ -159,13 +200,15 @@ app.post('/api/receipts', upload.single('receipt'), async (req, res) => {
   }
 });
 
-// Health check endpoint
+// Health check endpoint with more details
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok',
     mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     environment: process.env.NODE_ENV || 'development',
-    uploadsDir: uploadsDir
+    uploadsDir: uploadsDir,
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
   });
 });
 

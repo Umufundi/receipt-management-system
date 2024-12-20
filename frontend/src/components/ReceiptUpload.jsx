@@ -1,7 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './ReceiptUpload.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+
+// Add API health check
+const checkApiHealth = async () => {
+  try {
+    const response = await fetch(`${API_URL}/health`);
+    const data = await response.json();
+    console.log('API Health Check:', data);
+    return data.status === 'ok';
+  } catch (error) {
+    console.error('API Health Check Failed:', error);
+    return false;
+  }
+};
 
 const ReceiptUpload = () => {
   const [formData, setFormData] = useState({
@@ -20,6 +33,15 @@ const ReceiptUpload = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+
+  // Add useEffect to check API health on component mount
+  useEffect(() => {
+    checkApiHealth().then(isHealthy => {
+      if (!isHealthy) {
+        setError('Unable to connect to the server. Please try again later.');
+      }
+    });
+  }, []);
 
   const validateForm = () => {
     if (!formData.receipt) {
@@ -89,16 +111,22 @@ const ReceiptUpload = () => {
 
     try {
       console.log('Sending request to:', `${API_URL}/api/receipts`);
+      console.log('Environment:', process.env.NODE_ENV);
+      console.log('API URL:', API_URL);
+
       const response = await fetch(`${API_URL}/api/receipts`, {
         method: 'POST',
         body: data,
         mode: 'cors',
-        credentials: 'omit'
+        credentials: 'omit',
+        headers: {
+          'Accept': 'application/json',
+        }
       });
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload receipt');
+        throw new Error(errorData.error || `Failed to upload receipt: ${response.status} ${response.statusText}`);
       }
 
       const result = await response.json();
@@ -123,7 +151,7 @@ const ReceiptUpload = () => {
       if (fileInput) fileInput.value = '';
     } catch (error) {
       console.error('Upload failed:', error);
-      setError(error.message || 'Failed to connect to the server');
+      setError(error.message || 'Failed to connect to the server. Please check your internet connection and try again.');
     } finally {
       setLoading(false);
     }
